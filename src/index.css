@@ -21,6 +21,7 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
+  background: var(--bg);
 }
 
 body {
@@ -32,15 +33,18 @@ body {
   background: var(--bg);
   min-height: 100dvh;
   min-height: 100svh;
+  min-height: 100vh;
   overflow-x: hidden;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 #root {
   min-height: 100dvh;
   min-height: 100svh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
 .app {
