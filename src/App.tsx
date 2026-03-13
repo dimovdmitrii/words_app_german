@@ -407,21 +407,27 @@ export default function App() {
     
     const learningWord = toLearningWord(newWord)
     
+    let newPool = [...state.learningPool]
+    let newRemainingIds = [...state.remainingWordIds]
+    
+    if (newPool.length >= POOL_SIZE) {
+      // Pool full: move random word to queue, add new word to pool
+      const randomIdx = Math.floor(Math.random() * newPool.length)
+      const removedWord = newPool[randomIdx]
+      newPool.splice(randomIdx, 1)
+      newRemainingIds = [removedWord.id, ...newRemainingIds]
+    }
+    newPool.push(learningWord)
+    
     const newState: AppState = {
       ...state,
       customWords: [...state.customWords, newWord],
-      learningPool: state.learningPool.length < POOL_SIZE 
-        ? [...state.learningPool, learningWord]
-        : state.learningPool,
-      remainingWordIds: state.learningPool.length >= POOL_SIZE
-        ? [...state.remainingWordIds, newWord.id]
-        : state.remainingWordIds
+      learningPool: newPool,
+      remainingWordIds: newRemainingIds
     }
     
-    if (state.learningPool.length < POOL_SIZE) {
-      setCurrentWord(learningWord)
-      lastShownIdRef.current = learningWord.id
-    }
+    setCurrentWord(learningWord)
+    lastShownIdRef.current = learningWord.id
     
     persist(newState)
     return null
