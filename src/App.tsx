@@ -120,6 +120,33 @@ export default function App() {
         needsSave = true
       }
       
+      // Cleanup: remove words that no longer exist in vocabulary
+      const deletedSet = new Set(migratedState.deletedBaseIds)
+      const baseWordIds = new Set(words.filter(w => !deletedSet.has(w.id)).map(w => w.id))
+      const customWordIds = new Set(migratedState.customWords.map(w => w.id))
+      const validIds = new Set([...baseWordIds, ...customWordIds])
+      
+      const cleanedPool = migratedState.learningPool.filter(w => validIds.has(w.id))
+      const cleanedLearnedWords = migratedState.learnedWords.filter(w => validIds.has(w.id))
+      const cleanedLearnedIds = migratedState.learnedIds.filter(id => validIds.has(id))
+      const cleanedRemainingIds = migratedState.remainingWordIds.filter(id => validIds.has(id))
+      
+      if (
+        cleanedPool.length !== migratedState.learningPool.length ||
+        cleanedLearnedWords.length !== migratedState.learnedWords.length ||
+        cleanedLearnedIds.length !== migratedState.learnedIds.length ||
+        cleanedRemainingIds.length !== migratedState.remainingWordIds.length
+      ) {
+        migratedState = {
+          ...migratedState,
+          learningPool: cleanedPool,
+          learnedWords: cleanedLearnedWords,
+          learnedIds: cleanedLearnedIds,
+          remainingWordIds: cleanedRemainingIds
+        }
+        needsSave = true
+      }
+      
       if (needsSave) {
         await saveState(migratedState)
       }
