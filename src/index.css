@@ -1,0 +1,300 @@
+/* Mobile-first German Vocab PWA */
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --correct: #4ade80;
+  --wrong: #f87171;
+  --radius: 16px;
+  --tap: 48px;
+  --font: 'DM Sans', system-ui, -apple-system, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100dvh;
+  min-height: 100svh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100dvh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 12px 16px 24px;
+}
+
+/* Card */
+.card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  transition: opacity 0.15s ease;
+  position: relative;
+}
+
+.card-header {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  right: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: 0;
+}
+
+.card-word {
+  font-size: clamp(1.75rem, 6vw, 2.25rem);
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 8px;
+  line-height: 1.2;
+}
+
+.card-hint {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0 0 24px;
+}
+
+/* Options */
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.option-btn {
+  min-height: var(--tap);
+  padding: 14px 20px;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  text-align: center;
+}
+
+.option-btn:hover {
+  background: #334155;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.option-btn:active {
+  transform: scale(0.98);
+}
+
+.option-btn.correct {
+  background: var(--correct);
+  border-color: var(--correct);
+  color: #000;
+}
+
+.option-btn.wrong {
+  background: var(--wrong);
+  border-color: var(--wrong);
+  color: #000;
+}
+
+.option-btn:disabled {
+  cursor: default;
+}
+
+.option-btn.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.option-btn.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+@media (min-width: 400px) {
+  .app {
+    padding: 16px 20px 32px;
+  }
+  .card {
+    padding: 32px 24px;
+  }
+  .options {
+    max-width: 360px;
+  }
+}
+
+/* Hamburger menu button */
+.hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hamburger span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--text);
+  border-radius: 1px;
+}
+
+/* Menu overlay */
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.menu-screen {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.menu-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 24px;
+}
+
+.stats-list {
+  margin-bottom: 32px;
+  text-align: left;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stats-row:last-child {
+  border-bottom: none;
+}
+
+.stats-label {
+  color: var(--muted);
+}
+
+.stats-value {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.menu-btn {
+  padding: 16px 24px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.menu-btn:hover {
+  background: #334155;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.menu-btn.danger {
+  color: var(--wrong);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.menu-btn.danger:hover {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.5);
+}
