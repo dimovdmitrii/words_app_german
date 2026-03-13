@@ -25,17 +25,7 @@ export default defineConfig({
         categories: ['education']
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.json$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'vocab-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 }
-            }
-          }
-        ]
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}']
       },
       devOptions: { enabled: true }
     })
