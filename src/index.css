@@ -90,12 +90,38 @@ body {
   margin: 0;
 }
 
+.card-word-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .card-word {
   font-size: clamp(1.75rem, 6vw, 2.25rem);
   font-weight: 700;
   text-align: center;
-  margin: 0 0 8px;
+  margin: 0;
   line-height: 1.2;
+}
+
+.speak-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.speak-btn:hover {
+  opacity: 1;
+}
+
+.speak-btn:active {
+  transform: scale(0.9);
 }
 
 .card-hint {

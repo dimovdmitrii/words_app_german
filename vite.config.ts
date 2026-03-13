@@ -25,7 +25,7 @@ export default defineConfig({
         categories: ['education']
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json,mp3}']
       },
       devOptions: { enabled: true }
     })

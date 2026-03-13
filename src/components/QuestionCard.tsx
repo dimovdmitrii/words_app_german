@@ -1,5 +1,9 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { MenuButton } from './Menu'
+
+function getAudioFileName(german: string): string {
+  return `/sounds/${german}.mp3`
+}
 
 interface QuestionCardProps {
   german: string
@@ -20,6 +24,26 @@ export function QuestionCard({
 }: QuestionCardProps) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const playAudio = useCallback(() => {
+    const audioPath = getAudioFileName(german)
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+    const audio = new Audio(audioPath)
+    audioRef.current = audio
+    audio.play().catch(() => {})
+  }, [german])
+
+  useEffect(() => {
+    playAudio()
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+    }
+  }, [german])
 
   const handleClick = useCallback(
     (option: string) => () => {
@@ -45,7 +69,12 @@ export function QuestionCard({
         <p className="card-label">{isReview ? 'Review' : 'Learn'}</p>
         <MenuButton onClick={onMenuClick} />
       </div>
-      <h2 className="card-word">{german}</h2>
+      <div className="card-word-row">
+        <h2 className="card-word">{german}</h2>
+        <button className="speak-btn" onClick={playAudio} aria-label="Play pronunciation">
+          🔊
+        </button>
+      </div>
       <p className="card-hint">
         {options.length < 5
           ? `${options.length} options left`
