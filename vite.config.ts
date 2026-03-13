@@ -14,7 +14,7 @@ export default defineConfig({
         description: 'German vocabulary trainer – learn words with spaced repetition',
         theme_color: '#0f172a',
         background_color: '#0f172a',
-        display: 'fullscreen',
+        display: 'standalone',
         orientation: 'portrait',
         scope: '/',
         start_url: '/',
