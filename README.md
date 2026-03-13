@@ -2,6 +2,21 @@
 
 Mobile-first Progressive Web App for learning German vocabulary (B1–B2) with a learning-pool algorithm and spaced repetition.
 
+https://words-app-ten.vercel.app/
+
+### Install on your phone
+
+**Android (Chrome):**
+1. Open the link above in Chrome
+2. Tap ⋮ (menu) → "Add to Home screen" or "Install app"
+3. Confirm — the app appears on your home screen
+
+**iPhone (Safari):**
+1. Open the link above in Safari
+2. Tap the Share button (square with arrow)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add" — the app appears on your home screen
+
 ## Tech stack
 
 - **React 19** + **TypeScript**
