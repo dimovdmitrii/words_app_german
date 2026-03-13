@@ -1,8 +1,14 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { MenuButton } from './Menu'
 
-function getAudioFileName(german: string): string {
-  return `/sounds/${german}.mp3`
+function speakWithTTS(text: string) {
+  if ('speechSynthesis' in window) {
+    speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'de-DE'
+    utterance.rate = 0.9
+    speechSynthesis.speak(utterance)
+  }
 }
 
 interface QuestionCardProps {
@@ -27,13 +33,22 @@ export function QuestionCard({
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const playAudio = useCallback(() => {
-    const audioPath = getAudioFileName(german)
     if (audioRef.current) {
       audioRef.current.pause()
     }
+    speechSynthesis.cancel()
+    
+    const audioPath = `/sounds/${german}.mp3`
     const audio = new Audio(audioPath)
     audioRef.current = audio
-    audio.play().catch(() => {})
+    
+    audio.play().catch(() => {
+      speakWithTTS(german)
+    })
+    
+    audio.onerror = () => {
+      speakWithTTS(german)
+    }
   }, [german])
 
   useEffect(() => {
@@ -42,6 +57,7 @@ export function QuestionCard({
       if (audioRef.current) {
         audioRef.current.pause()
       }
+      speechSynthesis.cancel()
     }
   }, [german])
 
