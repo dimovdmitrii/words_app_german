@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 interface AddWordFormProps {
-  onAdd: (german: string, russian: string) => string | null
+  onAdd: (german: string, russian: string, category: string) => string | null
   onClose: () => void
 }
 
 export function AddWordForm({ onAdd, onClose }: AddWordFormProps) {
   const [german, setGerman] = useState('')
   const [russian, setRussian] = useState('')
+  const [category, setCategory] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const germanInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,7 +23,7 @@ export function AddWordForm({ onAdd, onClose }: AddWordFormProps) {
       return
     }
     
-    const addError = onAdd(trimmedGerman, trimmedRussian)
+    const addError = onAdd(trimmedGerman, trimmedRussian, category.trim())
     if (addError) {
       setError(addError)
       return
@@ -29,8 +31,12 @@ export function AddWordForm({ onAdd, onClose }: AddWordFormProps) {
     
     setGerman('')
     setRussian('')
+    setCategory('')
     setError(null)
-    onClose()
+    // вернуть фокус в поле немецкого слова для быстрого ввода серии
+    if (germanInputRef.current) {
+      germanInputRef.current.focus()
+    }
   }
 
   return (
@@ -52,6 +58,7 @@ export function AddWordForm({ onAdd, onClose }: AddWordFormProps) {
               placeholder="der Tisch, gehen, schnell..."
               autoComplete="off"
               autoFocus
+              ref={germanInputRef}
             />
           </div>
           
@@ -63,6 +70,18 @@ export function AddWordForm({ onAdd, onClose }: AddWordFormProps) {
               value={russian}
               onChange={(e) => setRussian(e.target.value)}
               placeholder="перевод"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="form-field">
+            <label htmlFor="category">Category (optional)</label>
+            <input
+              id="category"
+              type="text"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="например: Еда, Глаголы..."
               autoComplete="off"
             />
           </div>

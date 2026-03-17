@@ -8,6 +8,7 @@ interface MenuProps {
   onClose: () => void
   onAddWord: () => void
   onManageWords: () => void
+  onSelectCategories: () => void
 }
 
 export function Menu({
@@ -19,7 +20,8 @@ export function Menu({
   onReset,
   onClose,
   onAddWord,
-  onManageWords
+  onManageWords,
+  onSelectCategories
 }: MenuProps) {
   const handleReset = () => {
     if (window.confirm('Reset all progress? This cannot be undone.')) {
@@ -63,6 +65,9 @@ export function Menu({
           </button>
           <button className="menu-btn" onClick={onManageWords}>
             Manage Words
+          </button>
+          <button className="menu-btn" onClick={onSelectCategories}>
+            Categories
           </button>
           <button className="menu-btn danger" onClick={handleReset}>
             Reset Statistics

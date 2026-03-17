@@ -19,6 +19,7 @@ import { QuestionCard } from './components/QuestionCard'
 import { Menu, MenuButton } from './components/Menu'
 import { AddWordForm } from './components/AddWordForm'
 import { WordList } from './components/WordList'
+import { CategorySelector } from './components/CategorySelector'
 
 const WORDS_URL = '/words.json'
 
@@ -34,6 +35,7 @@ export default function App() {
   const [showMenu, setShowMenu] = useState(false)
   const [showAddWord, setShowAddWord] = useState(false)
   const [showWordList, setShowWordList] = useState(false)
+  const [showCategorySelector, setShowCategorySelector] = useState(false)
 
   // First pass queue (words not yet shown once)
   const [firstPassQueue, setFirstPassQueue] = useState<LearningWord[]>([])
@@ -47,14 +49,21 @@ export default function App() {
   // Track available options for current word (removed wrong answers disappear)
   const [currentOptions, setCurrentOptions] = useState<string[]>([])
 
-  // Compute active vocabulary: base - deleted + custom
+  // Compute active vocabulary: base - deleted + custom, then apply category filter if any
   const deletedBaseSet = new Set(state?.deletedBaseIds ?? [])
   const activeBaseWords = baseVocabulary.filter(w => !deletedBaseSet.has(w.id))
-  const vocabulary = [...activeBaseWords, ...(state?.customWords ?? [])]
+  const allWords = [...activeBaseWords, ...(state?.customWords ?? [])]
+  const activeCategories = state?.activeCategories ?? []
+  const vocabulary =
+    activeCategories.length === 0
+      ? allWords
+      : allWords.filter(
+          (w) => w.category && activeCategories.includes(w.category)
+        )
 
-  const totalWords = vocabulary.length
+  const totalWords = allWords.length
   const learnedCount = state?.learnedIds.length ?? 0
-  const wordsLeft = totalWords - learnedCount
+  const wordsLeft = Math.max(totalWords - learnedCount, 0)
   const errorsCount = state?.totalErrors ?? 0
 
   const persist = useCallback(async (newState: AppState) => {
@@ -120,6 +129,11 @@ export default function App() {
       
       if (!Array.isArray(saved.deletedBaseIds)) {
         migratedState = { ...migratedState, deletedBaseIds: [] }
+        needsSave = true
+      }
+
+      if (!Array.isArray(saved.activeCategories)) {
+        migratedState = { ...migratedState, activeCategories: [] }
         needsSave = true
       }
       
@@ -395,7 +409,26 @@ export default function App() {
   }, [])
   const closeWordList = useCallback(() => setShowWordList(false), [])
 
-  const handleAddWord = useCallback((german: string, russian: string): string | null => {
+  const openCategorySelector = useCallback(() => {
+    setShowMenu(false)
+    setShowCategorySelector(true)
+  }, [])
+  const closeCategorySelector = useCallback(() => setShowCategorySelector(false), [])
+
+  const handleUpdateCategories = useCallback(
+    (categories: string[]) => {
+      if (!state) return
+      const newState: AppState = {
+        ...state,
+        activeCategories: categories
+      }
+      persist(newState)
+      setShowCategorySelector(false)
+    },
+    [state, persist]
+  )
+
+  const handleAddWord = useCallback((german: string, russian: string, category: string): string | null => {
     if (!state) return 'App not loaded'
     
     if (isDuplicate(german, baseVocabulary, state.customWords)) {
@@ -405,7 +438,8 @@ export default function App() {
     const newWord: VocabEntry = {
       id: generateWordId(),
       german,
-      russian
+      russian,
+      category: category || undefined
     }
     
     const learningWord = toLearningWord(newWord)
@@ -414,13 +448,12 @@ export default function App() {
     let newRemainingIds = [...state.remainingWordIds]
     
     if (newPool.length >= POOL_SIZE) {
-      // Pool full: move random word to queue, add new word to pool
-      const randomIdx = Math.floor(Math.random() * newPool.length)
-      const removedWord = newPool[randomIdx]
-      newPool.splice(randomIdx, 1)
-      newRemainingIds = [removedWord.id, ...newRemainingIds]
+      // Pool full: put the new word at the front of the waiting queue
+      newRemainingIds = [learningWord.id, ...newRemainingIds]
+    } else {
+      // Pool has space: add new word directly to pool
+      newPool.push(learningWord)
     }
-    newPool.push(learningWord)
     
     const newState: AppState = {
       ...state,
@@ -501,6 +534,7 @@ export default function App() {
       onClose={closeMenu}
       onAddWord={openAddWord}
       onManageWords={openWordList}
+      onSelectCategories={openCategorySelector}
     />
   ) : null
 
@@ -517,6 +551,23 @@ export default function App() {
       onDeleteCustom={handleDeleteCustomWord}
       onRestoreBase={handleRestoreBaseWord}
       onClose={closeWordList}
+    />
+  ) : null
+
+  const allCategories = Array.from(
+    new Set(
+      [...baseVocabulary, ...(state?.customWords ?? [])]
+        .map((w) => w.category)
+        .filter((c): c is string => Boolean(c))
+    )
+  )
+
+  const categorySelectorElement = showCategorySelector ? (
+    <CategorySelector
+      categories={allCategories}
+      activeCategories={activeCategories}
+      onChange={handleUpdateCategories}
+      onClose={closeCategorySelector}
     />
   ) : null
 
@@ -576,6 +627,7 @@ export default function App() {
         {menuElement}
         {addWordElement}
         {wordListElement}
+        {categorySelectorElement}
       </div>
     )
   }
@@ -593,6 +645,7 @@ export default function App() {
         {menuElement}
         {addWordElement}
         {wordListElement}
+        {categorySelectorElement}
       </div>
     )
   }
@@ -610,6 +663,7 @@ export default function App() {
       {menuElement}
       {addWordElement}
       {wordListElement}
+      {categorySelectorElement}
     </div>
   )
 }

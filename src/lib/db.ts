@@ -58,7 +58,8 @@ export function createInitialState(vocabulary: VocabEntry[]): AppState {
     totalErrors: 0,
     lastSaved: new Date().toISOString(),
     customWords: [],
-    deletedBaseIds: []
+    deletedBaseIds: [],
+    activeCategories: []
   }
 }
 

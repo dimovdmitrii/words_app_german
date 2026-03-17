@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Deutsch Vokabeln</string>
+    <string name="title_activity_main">Deutsch Vokabeln</string>
+    <string name="package_name">com.dimovdmitrii.vokabeln</string>
+    <string name="custom_url_scheme">com.dimovdmitrii.vokabeln</string>
+</resources>

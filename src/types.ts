@@ -3,6 +3,7 @@ export interface VocabEntry {
   id: string
   german: string
   russian: string
+  category?: string
 }
 
 /** Word in the learning pool or review queue with progress */
@@ -23,6 +24,7 @@ export interface AppState {
   lastSaved: string // ISO date
   customWords: VocabEntry[] // user-added words
   deletedBaseIds: string[] // IDs of deleted base vocabulary words
+  activeCategories?: string[] // selected categories for learning (empty = all)
 }
 
 export const POOL_SIZE = 15
