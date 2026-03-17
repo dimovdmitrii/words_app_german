@@ -370,7 +370,6 @@ export function WordsManager({
                   onChange={e => { setGerman(e.target.value); setAddError(null) }}
                   placeholder="der Tisch, gehen, schnell…"
                   autoComplete="off"
-                  autoFocus
                   ref={germanRef}
                 />
               </div>

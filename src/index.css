@@ -667,7 +667,7 @@ body {
   color: var(--muted);
   transition: color 0.15s, background 0.15s;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 500;
   -webkit-tap-highlight-color: transparent;
 }
@@ -753,7 +753,7 @@ body {
 
 .cat-name {
   flex: 1;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: var(--text);
   white-space: nowrap;
