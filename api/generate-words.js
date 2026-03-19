@@ -27,6 +27,15 @@ function extractJSONArray(rawText) {
   }
 }
 
+function extractRetryAfterSec(message) {
+  if (typeof message !== 'string') return null
+  const match = message.match(/retry in\s+([\d.]+)\s*s/i)
+  if (!match) return null
+  const sec = Number(match[1])
+  if (!Number.isFinite(sec) || sec <= 0) return null
+  return Math.ceil(sec)
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
@@ -79,7 +88,8 @@ export default async function handler(req, res) {
     const payload = await response.json()
     if (!response.ok) {
       const message = payload?.error?.message || 'Gemini request failed'
-      res.status(502).json({ error: message })
+      const retryAfterSec = extractRetryAfterSec(message)
+      res.status(502).json({ error: message, retryAfterSec })
       return
     }
 

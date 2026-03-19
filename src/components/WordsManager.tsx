@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { VocabEntry } from '../types'
 
 export type ManagerTab = 'categories' | 'words' | 'add' | 'generate'
@@ -93,6 +93,44 @@ export function WordsManager({
   const [generatedWords, setGeneratedWords] = useState<GeneratedCandidate[]>([])
   const [rejectedGeneratedGerman, setRejectedGeneratedGerman] = useState<string[]>([])
   const GENERATE_TARGET = 15
+  const GENERATE_COOLDOWN_MS = 15000
+  const [cooldownUntil, setCooldownUntil] = useState(0)
+  const [cooldownNow, setCooldownNow] = useState(Date.now())
+
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return
+    const timer = window.setInterval(() => {
+      setCooldownNow(Date.now())
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [cooldownUntil])
+
+  const cooldownRemainingSec = Math.max(0, Math.ceil((cooldownUntil - cooldownNow) / 1000))
+  const isGenerateCooldown = cooldownRemainingSec > 0
+
+  const formatCooldown = (sec: number) => {
+    if (sec >= 60) {
+      const min = Math.ceil(sec / 60)
+      return `${min} min`
+    }
+    return `${sec} sec`
+  }
+
+  const extractRetrySeconds = (message: string): number | null => {
+    const match = message.match(/retry in\s+([\d.]+)\s*s/i)
+    if (!match) return null
+    const seconds = Number(match[1])
+    if (!Number.isFinite(seconds) || seconds <= 0) return null
+    return Math.ceil(seconds)
+  }
+
+  const applyRateLimitCooldown = (message: string) => {
+    const retrySec = extractRetrySeconds(message)
+    if (!retrySec) return
+    setCooldownNow(Date.now())
+    setCooldownUntil(Date.now() + retrySec * 1000)
+    setGenerateError(`Limit reached. Try again in ${formatCooldown(retrySec)}.`)
+  }
 
   // Category word counts
   const catCounts = useMemo(() => {
@@ -196,12 +234,20 @@ export function WordsManager({
 
     const data = await response.json()
     if (!response.ok) {
-      throw new Error(data?.error || 'Failed to generate words')
+      const retryAfterSec =
+        typeof data?.retryAfterSec === 'number' && data.retryAfterSec > 0
+          ? Math.ceil(data.retryAfterSec)
+          : null
+      const baseMessage = data?.error || 'Failed to generate words'
+      const enrichedMessage = retryAfterSec
+        ? `${baseMessage} Please retry in ${retryAfterSec}s.`
+        : baseMessage
+      throw new Error(enrichedMessage)
     }
     return Array.isArray(data.words) ? data.words : []
   }
 
-  const autoFillGeneratedWords = async (
+  const refillGeneratedWords = async (
     currentCandidates: GeneratedCandidate[],
     additionallyRejected: string[] = []
   ) => {
@@ -211,9 +257,15 @@ export function WordsManager({
     const missingCount = GENERATE_TARGET - currentCandidates.length
     if (missingCount <= 0) return
     if (isGenerating) return
+    if (isGenerateCooldown) {
+      setGenerateError(`Please wait ${formatCooldown(cooldownRemainingSec)} before next generation request.`)
+      return
+    }
 
     setIsGenerating(true)
     setGenerateError(null)
+    setCooldownNow(Date.now())
+    setCooldownUntil(Date.now() + GENERATE_COOLDOWN_MS)
 
     try {
       const excludedGerman = [
@@ -246,8 +298,11 @@ export function WordsManager({
         }
         return merged
       })
+      setGenerateInfo('List refilled')
     } catch (e) {
-      setGenerateError(e instanceof Error ? e.message : 'Auto generation failed')
+      const message = e instanceof Error ? e.message : 'Refill generation failed'
+      applyRateLimitCooldown(message)
+      setGenerateError(message)
     } finally {
       setIsGenerating(false)
     }
@@ -260,10 +315,17 @@ export function WordsManager({
       return
     }
 
+    if (isGenerateCooldown) {
+      setGenerateError(`Please wait ${formatCooldown(cooldownRemainingSec)} before next generation request.`)
+      return
+    }
+
     setIsGenerating(true)
     setGenerateError(null)
     setGenerateInfo(null)
     setRejectedGeneratedGerman([])
+    setCooldownNow(Date.now())
+    setCooldownUntil(Date.now() + GENERATE_COOLDOWN_MS)
 
     try {
       const words = await requestGeneratedWords(
@@ -283,7 +345,9 @@ export function WordsManager({
       setGeneratedWords(candidates)
       setGenerateInfo(`Generated ${candidates.length} words`)
     } catch (e) {
-      setGenerateError(e instanceof Error ? e.message : 'Generation failed')
+      const message = e instanceof Error ? e.message : 'Generation failed'
+      applyRateLimitCooldown(message)
+      setGenerateError(message)
     } finally {
       setIsGenerating(false)
     }
@@ -304,11 +368,21 @@ export function WordsManager({
       const normalized = removedWord.german.toLowerCase().trim()
       const updatedRejected = [...rejectedGeneratedGerman, normalized]
       setRejectedGeneratedGerman(updatedRejected)
-      setGenerateInfo('Auto-generating replacement...')
-      void autoFillGeneratedWords(nextWords, [normalized]).then(() => {
-        setGenerateInfo('Replacement generated')
-      })
+      setGenerateInfo('Word removed. Use "Refill to 15" to generate replacement.')
     }
+  }
+
+  const handleRefillToTarget = () => {
+    void refillGeneratedWords(generatedWords)
+  }
+
+  const handleTryAgain = () => {
+    if (isGenerateCooldown || isGenerating) return
+    if (generatedWords.length > 0 && generatedWords.length < GENERATE_TARGET) {
+      void refillGeneratedWords(generatedWords)
+      return
+    }
+    void handleGenerateWords()
   }
 
   const handleAddGeneratedWords = () => {
@@ -638,16 +712,47 @@ export function WordsManager({
                 type="button"
                 className="menu-btn primary"
                 onClick={handleGenerateWords}
-                disabled={isGenerating}
+                disabled={isGenerating || isGenerateCooldown}
               >
-                {isGenerating ? 'Generating...' : 'Generate 15 words (B1-B2)'}
+                {isGenerating
+                  ? 'Generating...'
+                  : isGenerateCooldown
+                  ? `Try in ${formatCooldown(cooldownRemainingSec)}`
+                  : 'Generate 15 words (B1-B2)'}
               </button>
 
               {generateError && <p className="wm-form-error">{generateError}</p>}
+              {generateError && (
+                <button
+                  type="button"
+                  className="menu-btn"
+                  onClick={handleTryAgain}
+                  disabled={isGenerating || isGenerateCooldown}
+                >
+                  {isGenerateCooldown
+                    ? `Try again in ${formatCooldown(cooldownRemainingSec)}`
+                    : 'Try again'}
+                </button>
+              )}
               {generateInfo && <div className="wm-form-success">{generateInfo}</div>}
 
               {generatedWords.length > 0 && (
                 <>
+                  {generatedWords.length < GENERATE_TARGET && (
+                    <button
+                      type="button"
+                      className="menu-btn"
+                      onClick={handleRefillToTarget}
+                      disabled={isGenerating || isGenerateCooldown}
+                    >
+                      {isGenerating
+                        ? 'Refilling...'
+                        : isGenerateCooldown
+                        ? `Try in ${formatCooldown(cooldownRemainingSec)}`
+                        : `Refill to ${GENERATE_TARGET} (${GENERATE_TARGET - generatedWords.length} missing)`}
+                    </button>
+                  )}
+
                   <div className="wm-word-list">
                     {generatedWords.map((w) => (
                       <div key={w.id} className="wm-word-item">
