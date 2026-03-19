@@ -91,6 +91,8 @@ export function WordsManager({
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [generateInfo, setGenerateInfo] = useState<string | null>(null)
   const [generatedWords, setGeneratedWords] = useState<GeneratedCandidate[]>([])
+  const [rejectedGeneratedGerman, setRejectedGeneratedGerman] = useState<string[]>([])
+  const GENERATE_TARGET = 15
 
   // Category word counts
   const catCounts = useMemo(() => {
@@ -176,6 +178,81 @@ export function WordsManager({
     germanRef.current?.focus()
   }
 
+  const requestGeneratedWords = async (
+    category: string,
+    count: number,
+    excludedGerman: string[]
+  ): Promise<Array<{ german: string; russian: string }>> => {
+    const response = await fetch('/api/generate-words', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category,
+        level: 'B1-B2',
+        count,
+        existingGerman: excludedGerman
+      })
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data?.error || 'Failed to generate words')
+    }
+    return Array.isArray(data.words) ? data.words : []
+  }
+
+  const autoFillGeneratedWords = async (
+    currentCandidates: GeneratedCandidate[],
+    additionallyRejected: string[] = []
+  ) => {
+    const category = generateCategory.trim()
+    if (!category) return
+
+    const missingCount = GENERATE_TARGET - currentCandidates.length
+    if (missingCount <= 0) return
+    if (isGenerating) return
+
+    setIsGenerating(true)
+    setGenerateError(null)
+
+    try {
+      const excludedGerman = [
+        ...allWords.map((w) => w.german),
+        ...currentCandidates.map((w) => w.german),
+        ...rejectedGeneratedGerman,
+        ...additionallyRejected
+      ]
+      const words = await requestGeneratedWords(category, missingCount, excludedGerman)
+      if (words.length === 0) return
+
+      const newCandidates: GeneratedCandidate[] = words.map(
+        (w: { german: string; russian: string }, index: number) => ({
+          id: `${Date.now()}_${index}_${w.german}`,
+          german: w.german,
+          russian: w.russian,
+          category,
+          selected: true
+        })
+      )
+
+      setGeneratedWords((prev) => {
+        const seen = new Set(prev.map((w) => w.german.toLowerCase()))
+        const merged = [...prev]
+        for (const item of newCandidates) {
+          const key = item.german.toLowerCase()
+          if (seen.has(key)) continue
+          seen.add(key)
+          merged.push(item)
+        }
+        return merged
+      })
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'Auto generation failed')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const handleGenerateWords = async () => {
     const category = generateCategory.trim()
     if (!category) {
@@ -186,33 +263,20 @@ export function WordsManager({
     setIsGenerating(true)
     setGenerateError(null)
     setGenerateInfo(null)
+    setRejectedGeneratedGerman([])
 
     try {
-      const existingGerman = allWords.map((w) => w.german)
-      const response = await fetch('/api/generate-words', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category,
-          level: 'B1-B2',
-          count: 15,
-          existingGerman
-        })
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to generate words')
-      }
-
-      const words = Array.isArray(data.words) ? data.words : []
-      const normalizedCategory = category
+      const words = await requestGeneratedWords(
+        category,
+        GENERATE_TARGET,
+        allWords.map((w) => w.german)
+      )
       const candidates: GeneratedCandidate[] = words.map(
         (w: { german: string; russian: string }, index: number) => ({
           id: `${Date.now()}_${index}_${w.german}`,
           german: w.german,
           russian: w.russian,
-          category: normalizedCategory,
+          category,
           selected: true
         })
       )
@@ -232,7 +296,19 @@ export function WordsManager({
   }
 
   const removeGeneratedWord = (id: string) => {
-    setGeneratedWords((prev) => prev.filter((w) => w.id !== id))
+    const removedWord = generatedWords.find((w) => w.id === id)
+    const nextWords = generatedWords.filter((w) => w.id !== id)
+    setGeneratedWords(nextWords)
+
+    if (removedWord) {
+      const normalized = removedWord.german.toLowerCase().trim()
+      const updatedRejected = [...rejectedGeneratedGerman, normalized]
+      setRejectedGeneratedGerman(updatedRejected)
+      setGenerateInfo('Auto-generating replacement...')
+      void autoFillGeneratedWords(nextWords, [normalized]).then(() => {
+        setGenerateInfo('Replacement generated')
+      })
+    }
   }
 
   const handleAddGeneratedWords = () => {
