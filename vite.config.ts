@@ -74,12 +74,12 @@ async function generateWordsWithGemini(
   }
 
   const rawText = extractTextFromGeminiResponse(payload)
-  const parsed = extractJSONArray(rawText)
-  if (!parsed) throw new Error('Invalid response format from Gemini')
+  const words = extractJSONArray(rawText)
+  if (!words) throw new Error('Invalid response format from Gemini')
 
   const localSet = new Set(existingGerman.map((w) => normalize(w)))
   const unique: Array<{ german: string; russian: string }> = []
-  for (const item of parsed) {
+  for (const item of words) {
     const german = item && typeof item === 'object' && 'german' in item ? String((item as { german?: string }).german || '').trim() : ''
     const russian = item && typeof item === 'object' && 'russian' in item ? String((item as { russian?: string }).russian || '').trim() : ''
     if (!german || !russian) continue
@@ -96,7 +96,7 @@ async function generateWordsWithGemini(
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const geminiApiKey = env.GEMINI_API_KEY
-  const geminiModel = env.GEMINI_MODEL || 'gemini-2.0-flash'
+  const geminiModel = env.GEMINI_MODEL || 'gemini-2.5-flash'
 
   return {
     plugins: [

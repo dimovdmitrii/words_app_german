@@ -54,12 +54,14 @@ The app supports generating category-based B1-B2 words via Gemini with a server 
 - Endpoint: `POST /api/generate-words`
 - Runtime: Vercel serverless function (`api/generate-words.js`)
 - Required env var: `GEMINI_API_KEY`
+- Optional env var: `GEMINI_MODEL` (default `gemini-2.5-flash`)
 
 ### Configure on Vercel
 
 1. Open project settings on Vercel
 2. Add environment variable `GEMINI_API_KEY`
-3. Redeploy
+3. (Optional) add `GEMINI_MODEL`
+4. Redeploy
 
 ### Local development
 

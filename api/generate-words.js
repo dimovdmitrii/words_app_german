@@ -1,16 +1,8 @@
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 function normalize(text) {
   return String(text || '').trim().toLowerCase()
-}
-
-function extractTextFromGeminiResponse(payload) {
-  const parts = payload?.candidates?.[0]?.content?.parts
-  if (!Array.isArray(parts)) return ''
-  return parts
-    .map((p) => (typeof p?.text === 'string' ? p.text : ''))
-    .join('\n')
 }
 
 function extractJSONArray(rawText) {
@@ -93,16 +85,19 @@ export default async function handler(req, res) {
       return
     }
 
-    const rawText = extractTextFromGeminiResponse(payload)
-    const parsed = extractJSONArray(rawText)
-    if (!Array.isArray(parsed)) {
+    const parts = payload?.candidates?.[0]?.content?.parts
+    const rawText = Array.isArray(parts)
+      ? parts.map((p) => (typeof p?.text === 'string' ? p.text : '')).join('\n')
+      : ''
+    const words = extractJSONArray(rawText)
+    if (!Array.isArray(words)) {
       res.status(502).json({ error: 'Invalid response format from Gemini' })
       return
     }
 
     const unique = []
     const localSet = new Set(existingSet)
-    for (const item of parsed) {
+    for (const item of words) {
       const german = String(item?.german || '').trim()
       const russian = String(item?.russian || '').trim()
       if (!german || !russian) continue
