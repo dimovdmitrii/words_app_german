@@ -47,17 +47,12 @@ export default function App() {
   // Track available options for current word (removed wrong answers disappear)
   const [currentOptions, setCurrentOptions] = useState<string[]>([])
 
-  // Compute active vocabulary: base - deleted + custom, then apply category filter if any
+  // Compute active vocabulary: base - deleted + custom
   const deletedBaseSet = new Set(state?.deletedBaseIds ?? [])
   const activeBaseWords = baseVocabulary.filter(w => !deletedBaseSet.has(w.id))
   const allWords = [...activeBaseWords, ...(state?.customWords ?? [])]
   const activeCategories = state?.activeCategories ?? []
-  const vocabulary =
-    activeCategories.length === 0
-      ? allWords
-      : allWords.filter(
-          (w) => w.category && activeCategories.includes(w.category)
-        )
+  const vocabulary = allWords
 
   const totalWords = allWords.length
   const learnedCount = state?.learnedIds.length ?? 0
@@ -405,9 +400,51 @@ export default function App() {
   const handleUpdateCategories = useCallback(
     (categories: string[]) => {
       if (!state) return
-      persist({ ...state, activeCategories: categories })
+
+      const learnedSet = new Set(state.learnedIds)
+      const selectedSet = new Set(categories)
+
+      const unlearnedWords = allWords.filter((w) => !learnedSet.has(w.id))
+      const prioritizedWords =
+        categories.length === 0
+          ? [...unlearnedWords]
+          : [
+              ...unlearnedWords.filter((w) => w.category && selectedSet.has(w.category)),
+              ...unlearnedWords.filter((w) => !w.category || !selectedSet.has(w.category))
+            ]
+
+      const existingPoolMap = new Map(state.learningPool.map((w) => [w.id, w]))
+      const nextPoolWords = prioritizedWords.slice(0, POOL_SIZE)
+      const nextPool = nextPoolWords.map((entry) => existingPoolMap.get(entry.id) ?? toLearningWord(entry))
+      const nextRemainingIds = prioritizedWords.slice(POOL_SIZE).map((w) => w.id)
+
+      const newState: AppState = {
+        ...state,
+        activeCategories: categories,
+        learningPool: nextPool,
+        remainingWordIds: nextRemainingIds
+      }
+      persist(newState)
+
+      // Close manager and continue with learning flow immediately.
+      setShowWordsManager(false)
+      setReviewQueue([])
+      setCurrentIndex(0)
+
+      if (nextPool.length === 0) {
+        setCurrentWord(null)
+        setFirstPassQueue([])
+        setPhase('round-complete')
+        return
+      }
+
+      const shuffledPool = shuffle([...nextPool])
+      setFirstPassQueue(shuffledPool.slice(1))
+      setCurrentWord(shuffledPool[0])
+      lastShownIdRef.current = shuffledPool[0]?.id ?? null
+      setPhase('learn')
     },
-    [state, persist]
+    [state, allWords, persist]
   )
 
   const handleAddWord = useCallback((german: string, russian: string, category: string): string | null => {
@@ -449,6 +486,81 @@ export default function App() {
     
     persist(newState)
     return null
+  }, [state, baseVocabulary, persist])
+
+  const handleAddWordsBulk = useCallback((
+    words: Array<{ german: string; russian: string; category: string }>
+  ): { added: number; skipped: number } => {
+    if (!state) return { added: 0, skipped: words.length }
+
+    let newPool = [...state.learningPool]
+    let newRemainingIds = [...state.remainingWordIds]
+    const newCustomWords = [...state.customWords]
+
+    const existingGermanSet = new Set(
+      [...baseVocabulary, ...state.customWords].map((w) => w.german.toLowerCase().trim())
+    )
+
+    let added = 0
+    let skipped = 0
+    let lastAddedWord: LearningWord | null = null
+
+    for (const word of words) {
+      const german = word.german.trim()
+      const russian = word.russian.trim()
+      const category = word.category.trim()
+
+      if (!german || !russian) {
+        skipped += 1
+        continue
+      }
+
+      const normalized = german.toLowerCase()
+      if (existingGermanSet.has(normalized)) {
+        skipped += 1
+        continue
+      }
+
+      existingGermanSet.add(normalized)
+
+      const newWord: VocabEntry = {
+        id: generateWordId(),
+        german,
+        russian,
+        category: category || undefined
+      }
+      newCustomWords.push(newWord)
+
+      const learningWord = toLearningWord(newWord)
+      lastAddedWord = learningWord
+
+      if (newPool.length >= POOL_SIZE) {
+        newRemainingIds = [learningWord.id, ...newRemainingIds]
+      } else {
+        newPool.push(learningWord)
+      }
+
+      added += 1
+    }
+
+    if (added === 0) {
+      return { added, skipped }
+    }
+
+    const newState: AppState = {
+      ...state,
+      customWords: newCustomWords,
+      learningPool: newPool,
+      remainingWordIds: newRemainingIds
+    }
+    persist(newState)
+
+    if (lastAddedWord) {
+      setCurrentWord(lastAddedWord)
+      lastShownIdRef.current = lastAddedWord.id
+    }
+
+    return { added, skipped }
   }, [state, baseVocabulary, persist])
 
   const handleDeleteBaseWord = useCallback((id: string) => {
@@ -540,6 +652,7 @@ export default function App() {
       onDeleteCustom={handleDeleteCustomWord}
       onRestoreBase={handleRestoreBaseWord}
       onAddWord={handleAddWord}
+      onAddWordsBulk={handleAddWordsBulk}
       onClose={closeWordsManager}
     />
   ) : null

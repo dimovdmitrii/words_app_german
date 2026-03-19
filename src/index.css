@@ -349,9 +349,9 @@ body {
 }
 
 .menu-btn.primary {
-  background: var(--accent);
-  color: var(--bg);
-  border-color: var(--accent);
+  color: var(--text);
+  background: var(--bg);
+  border: 2px solid rgba(255, 255, 255, 0.1);
 }
 
 .menu-btn.primary:hover {
@@ -667,7 +667,7 @@ body {
   color: var(--muted);
   transition: color 0.15s, background 0.15s;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 500;
   -webkit-tap-highlight-color: transparent;
 }
@@ -683,8 +683,12 @@ body {
 }
 
 .wm-tab-icon {
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   line-height: 1;
+}
+
+.wm-tab-icon-add {
+  color: var(--correct);
 }
 
 /* Active filter dot indicator on Categories tab */
@@ -867,6 +871,24 @@ body {
   gap: 10px;
 }
 
+.wm-select-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.wm-select-btn.selected {
+  background: rgba(74, 222, 128, 0.22);
+  border-color: rgba(74, 222, 128, 0.5);
+  color: var(--correct);
+}
+
 .wm-word-info {
   flex: 1;
   min-width: 0;
@@ -954,6 +976,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  position: relative;
 }
 
 .wm-form-label {
@@ -983,6 +1006,37 @@ body {
 .wm-form-input::placeholder {
   color: var(--muted);
   opacity: 0.6;
+}
+
+.wm-category-suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.38);
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.wm-category-suggestion-item {
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.wm-category-suggestion-item:hover {
+  background: rgba(56, 189, 248, 0.12);
 }
 
 .wm-form-error {

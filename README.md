@@ -47,6 +47,25 @@ npm run build
 
 Output is in `dist/`. Serve over HTTPS for full PWA (install prompt, service worker). For Android, use a host that supports HTTPS and ensure `manifest.webmanifest` and `sw.js` are served.
 
+## AI word generation (Gemini)
+
+The app supports generating category-based B1-B2 words via Gemini with a server endpoint:
+
+- Endpoint: `POST /api/generate-words`
+- Runtime: Vercel serverless function (`api/generate-words.js`)
+- Required env var: `GEMINI_API_KEY`
+
+### Configure on Vercel
+
+1. Open project settings on Vercel
+2. Add environment variable `GEMINI_API_KEY`
+3. Redeploy
+
+### Local development
+
+- UI works locally with `npm run dev`
+- The AI generation endpoint requires running in an environment that serves `/api/*` (e.g. Vercel dev/deploy). If API is unavailable, generation will show an error in UI.
+
 ## Vocabulary
 
 - **Source**: `public/words.json` (array of `{ id, german, russian }`).

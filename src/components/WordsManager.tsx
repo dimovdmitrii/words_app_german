@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react'
 import type { VocabEntry } from '../types'
 
-export type ManagerTab = 'categories' | 'words' | 'add'
+export type ManagerTab = 'categories' | 'words' | 'add' | 'generate'
 type WordsSubTab = 'active' | 'custom' | 'deleted'
 
 const CATEGORY_COLORS = [
@@ -21,6 +21,7 @@ const TAB_TITLES: Record<ManagerTab, string> = {
   categories: 'Categories',
   words: 'Manage Words',
   add: 'Add Word',
+  generate: 'Generate Words',
 }
 
 interface WordsManagerProps {
@@ -36,7 +37,18 @@ interface WordsManagerProps {
   onDeleteCustom: (id: string) => void
   onRestoreBase: (id: string) => void
   onAddWord: (german: string, russian: string, category: string) => string | null
+  onAddWordsBulk: (
+    words: Array<{ german: string; russian: string; category: string }>
+  ) => { added: number; skipped: number }
   onClose: () => void
+}
+
+interface GeneratedCandidate {
+  id: string
+  german: string
+  russian: string
+  category: string
+  selected: boolean
 }
 
 export function WordsManager({
@@ -52,13 +64,13 @@ export function WordsManager({
   onDeleteCustom,
   onRestoreBase,
   onAddWord,
+  onAddWordsBulk,
   onClose,
 }: WordsManagerProps) {
   const [tab, setTab] = useState<ManagerTab>(initialTab)
 
   // — Categories tab —
   const [selectedCats, setSelectedCats] = useState<string[]>(activeCategories)
-  const [applyFeedback, setApplyFeedback] = useState(false)
 
   // — Words tab —
   const [wordsTab, setWordsTab] = useState<WordsSubTab>('active')
@@ -68,9 +80,17 @@ export function WordsManager({
   const [german, setGerman] = useState('')
   const [russian, setRussian] = useState('')
   const [addCategory, setAddCategory] = useState('')
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [addSuccess, setAddSuccess] = useState(false)
   const germanRef = useRef<HTMLInputElement>(null)
+
+  // — Generate tab —
+  const [generateCategory, setGenerateCategory] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+  const [generateInfo, setGenerateInfo] = useState<string | null>(null)
+  const [generatedWords, setGeneratedWords] = useState<GeneratedCandidate[]>([])
 
   // Category word counts
   const catCounts = useMemo(() => {
@@ -81,38 +101,39 @@ export function WordsManager({
     return counts
   }, [allWords])
 
-  // Whether pending selection differs from what's applied in state
-  const isApplied = useMemo(() => {
-    if (selectedCats.length !== activeCategories.length) return false
-    const a = [...selectedCats].sort().join('\0')
-    const b = [...activeCategories].sort().join('\0')
-    return a === b
-  }, [selectedCats, activeCategories])
-
   const isAllSelected = selectedCats.length === 0
 
   // — Category handlers —
   const toggleCat = (cat: string) => {
-    setApplyFeedback(false)
     setSelectedCats(prev =>
       prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
     )
   }
 
   const selectAll = () => {
-    setApplyFeedback(false)
     setSelectedCats([])
   }
 
   const handleApplyCategories = () => {
     onUpdateCategories(selectedCats)
-    setApplyFeedback(true)
-    setTimeout(() => setApplyFeedback(false), 1800)
+    onClose()
   }
 
   const applyBtnLabel = isAllSelected
     ? 'Apply — All words'
     : `Apply (${selectedCats.length} selected)`
+
+  const filteredCategorySuggestions = useMemo(() => {
+    const query = addCategory.trim().toLowerCase()
+    if (!query) return categories
+    return categories.filter((cat) => cat.toLowerCase().includes(query))
+  }, [categories, addCategory])
+
+  const filteredGenerateSuggestions = useMemo(() => {
+    const query = generateCategory.trim().toLowerCase()
+    if (!query) return categories
+    return categories.filter((cat) => cat.toLowerCase().includes(query))
+  }, [categories, generateCategory])
 
   // — Words tab helpers —
   const deletedSet = new Set(deletedBaseIds)
@@ -153,6 +174,83 @@ export function WordsManager({
     setAddSuccess(true)
     setTimeout(() => setAddSuccess(false), 2000)
     germanRef.current?.focus()
+  }
+
+  const handleGenerateWords = async () => {
+    const category = generateCategory.trim()
+    if (!category) {
+      setGenerateError('Set category first')
+      return
+    }
+
+    setIsGenerating(true)
+    setGenerateError(null)
+    setGenerateInfo(null)
+
+    try {
+      const existingGerman = allWords.map((w) => w.german)
+      const response = await fetch('/api/generate-words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category,
+          level: 'B1-B2',
+          count: 15,
+          existingGerman
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to generate words')
+      }
+
+      const words = Array.isArray(data.words) ? data.words : []
+      const normalizedCategory = category
+      const candidates: GeneratedCandidate[] = words.map(
+        (w: { german: string; russian: string }, index: number) => ({
+          id: `${Date.now()}_${index}_${w.german}`,
+          german: w.german,
+          russian: w.russian,
+          category: normalizedCategory,
+          selected: true
+        })
+      )
+      setGeneratedWords(candidates)
+      setGenerateInfo(`Generated ${candidates.length} words`)
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : 'Generation failed')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const toggleGeneratedSelection = (id: string) => {
+    setGeneratedWords((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, selected: !w.selected } : w))
+    )
+  }
+
+  const removeGeneratedWord = (id: string) => {
+    setGeneratedWords((prev) => prev.filter((w) => w.id !== id))
+  }
+
+  const handleAddGeneratedWords = () => {
+    const selected = generatedWords.filter((w) => w.selected)
+    if (selected.length === 0) {
+      setGenerateError('Select at least one word')
+      return
+    }
+
+    const result = onAddWordsBulk(
+      selected.map((w) => ({
+        german: w.german,
+        russian: w.russian,
+        category: w.category
+      }))
+    )
+    setGenerateInfo(`Added: ${result.added}, skipped: ${result.skipped}`)
+    setGeneratedWords((prev) => prev.filter((w) => !w.selected))
   }
 
   // Active filter badge shown in header
@@ -252,19 +350,13 @@ export function WordsManager({
 
                   {/* Apply bar */}
                   <div className="cat-apply-bar">
-                    {applyFeedback ? (
-                      <div className="cat-apply-feedback">
-                        <span className="cat-apply-check">✓</span> Applied!
-                      </div>
-                    ) : (
-                      <button
-                        className={`menu-btn${!isApplied ? ' primary' : ''}`}
-                        style={{ width: '100%' }}
-                        onClick={handleApplyCategories}
-                      >
-                        {applyBtnLabel}
-                      </button>
-                    )}
+                    <button
+                      className="menu-btn primary"
+                      style={{ width: '100%' }}
+                      onClick={handleApplyCategories}
+                    >
+                      {applyBtnLabel}
+                    </button>
                   </div>
                 </>
               )}
@@ -397,15 +489,35 @@ export function WordsManager({
                   id="wm-add-cat"
                   className="wm-form-input"
                   type="text"
-                  list="wm-cat-datalist"
                   value={addCategory}
-                  onChange={e => setAddCategory(e.target.value)}
+                  onChange={e => {
+                    setAddCategory(e.target.value)
+                    setShowCategorySuggestions(true)
+                  }}
+                  onFocus={() => setShowCategorySuggestions(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setShowCategorySuggestions(false), 120)
+                  }}
                   placeholder="например: IT, Verben…"
                   autoComplete="off"
                 />
-                <datalist id="wm-cat-datalist">
-                  {categories.map(c => <option key={c} value={c} />)}
-                </datalist>
+                {showCategorySuggestions && filteredCategorySuggestions.length > 0 && (
+                  <div className="wm-category-suggestions">
+                    {filteredCategorySuggestions.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        className="wm-category-suggestion-item"
+                        onClick={() => {
+                          setAddCategory(cat)
+                          setShowCategorySuggestions(false)
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {addError && <p className="wm-form-error">{addError}</p>}
@@ -420,6 +532,82 @@ export function WordsManager({
                 Add to learning pool
               </button>
             </form>
+          )}
+
+          {/* ════ GENERATE TAB ════ */}
+          {tab === 'generate' && (
+            <div className="wm-form">
+              <div className="wm-form-field">
+                <label className="wm-form-label" htmlFor="wm-generate-cat">
+                  Category *
+                </label>
+                <input
+                  id="wm-generate-cat"
+                  className="wm-form-input"
+                  type="text"
+                  value={generateCategory}
+                  onChange={(e) => setGenerateCategory(e.target.value)}
+                  placeholder="например: Reisen, Arbeit, Medizin..."
+                  autoComplete="off"
+                  list="wm-generate-cat-list"
+                />
+                <datalist id="wm-generate-cat-list">
+                  {filteredGenerateSuggestions.map((cat) => (
+                    <option key={cat} value={cat} />
+                  ))}
+                </datalist>
+              </div>
+
+              <button
+                type="button"
+                className="menu-btn primary"
+                onClick={handleGenerateWords}
+                disabled={isGenerating}
+              >
+                {isGenerating ? 'Generating...' : 'Generate 15 words (B1-B2)'}
+              </button>
+
+              {generateError && <p className="wm-form-error">{generateError}</p>}
+              {generateInfo && <div className="wm-form-success">{generateInfo}</div>}
+
+              {generatedWords.length > 0 && (
+                <>
+                  <div className="wm-word-list">
+                    {generatedWords.map((w) => (
+                      <div key={w.id} className="wm-word-item">
+                        <button
+                          type="button"
+                          className={`wm-select-btn${w.selected ? ' selected' : ''}`}
+                          onClick={() => toggleGeneratedSelection(w.id)}
+                          aria-label={w.selected ? 'Deselect word' : 'Select word'}
+                        >
+                          {w.selected ? '✓' : ''}
+                        </button>
+                        <div className="wm-word-info">
+                          <div className="wm-word-german">{w.german}</div>
+                          <div className="wm-word-russian">{w.russian}</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="wm-action-btn delete"
+                          onClick={() => removeGeneratedWord(w.id)}
+                          aria-label="Remove generated word"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="menu-btn primary"
+                    onClick={handleAddGeneratedWords}
+                  >
+                    Add selected to pool
+                  </button>
+                </>
+              )}
+            </div>
           )}
 
         </div>{/* /wm-content */}
@@ -452,8 +640,17 @@ export function WordsManager({
             onClick={() => setTab('add')}
             aria-current={tab === 'add' ? 'page' : undefined}
           >
-            <span className="wm-tab-icon" aria-hidden="true">✚</span>
+            <span className="wm-tab-icon wm-tab-icon-add" aria-hidden="true">✚</span>
             <span>Add Word</span>
+          </button>
+
+          <button
+            className={`wm-tab-btn${tab === 'generate' ? ' active' : ''}`}
+            onClick={() => setTab('generate')}
+            aria-current={tab === 'generate' ? 'page' : undefined}
+          >
+            <span className="wm-tab-icon" aria-hidden="true">✨</span>
+            <span>Generate</span>
           </button>
         </nav>
 
