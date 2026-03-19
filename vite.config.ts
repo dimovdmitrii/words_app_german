@@ -2,6 +2,8 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const ALLOWED_LEVELS = new Set(['A1-A2', 'B1-B2', 'C1-C2'])
+
 function normalize(text: string): string {
   return String(text || '').trim().toLowerCase()
 }
@@ -29,6 +31,54 @@ function extractJSONArray(rawText: string): unknown[] | null {
   }
 }
 
+function isLikelyGermanWord(value: string): boolean {
+  const text = String(value || '').trim()
+  if (!text) return false
+  return /^[A-Za-zÄÖÜäöüß\- ]+$/.test(text)
+}
+
+function isLikelyRussianText(value: string): boolean {
+  const text = String(value || '').trim()
+  if (!text) return false
+  // One-word Russian translation only (hyphenated form allowed).
+  if (/\s/.test(text)) return false
+  return /^[А-Яа-яЁё-]+$/.test(text)
+}
+
+function parseCandidates(rawText: string): unknown[] | null {
+  const parsed = extractJSONArray(rawText)
+  if (Array.isArray(parsed)) return parsed
+  try {
+    const asObject = JSON.parse(rawText) as { words?: unknown[] }
+    return Array.isArray(asObject.words) ? asObject.words : null
+  } catch {
+    return null
+  }
+}
+
+function buildPrompt(
+  category: string,
+  level: string,
+  count: number,
+  existingGerman: string[]
+): string {
+  return [
+    `Generate exactly ${count} German vocabulary items for category "${category}".`,
+    `Target CEFR level MUST be ${level}.`,
+    'Return ONLY valid JSON.',
+    'Preferred shape: [{"german":"...", "russian":"...", "level":"...","spellingOk":true,"translationAccurate":true}].',
+    'Alternative valid shape: {"words":[...]} with same fields.',
+    'Rules:',
+    '- german: correct spelling, natural German (no typos, no random forms).',
+    '- russian: accurate translation in exactly ONE Russian word.',
+    '- level must exactly match requested band.',
+    '- spellingOk must be true only if spelling is correct.',
+    '- translationAccurate must be true only if translation is accurate.',
+    '- Avoid duplicates and slang.',
+    `- Exclude these German words: ${JSON.stringify(existingGerman)}`
+  ].join('\n')
+}
+
 async function generateWordsWithGemini(
   apiKey: string,
   model: string,
@@ -37,60 +87,68 @@ async function generateWordsWithGemini(
   count: number,
   existingGerman: string[]
 ): Promise<Array<{ german: string; russian: string }>> {
-  const prompt = [
-    `Generate exactly ${count} German vocabulary words for category "${category}".`,
-    `Difficulty level must be ${level}.`,
-    'Return ONLY a JSON array. No markdown, no explanations.',
-    'Each item must be: {"german":"...", "russian":"..."}',
-    'Use concise single-word or short phrase entries.',
-    'Avoid slang and duplicates.',
-    'If a word from the existing list appears, replace it with another word.',
-    `Existing German words to exclude: ${JSON.stringify(existingGerman)}`
-  ].join('\n')
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        generationConfig: {
-          temperature: 0.6,
-          topP: 0.95,
-          responseMimeType: 'application/json'
-        },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }]
-      })
-    }
-  )
-
-  const payload = await response.json()
-  if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'error' in payload
-        ? ((payload as { error?: { message?: string } }).error?.message ?? 'Gemini request failed')
-        : 'Gemini request failed'
-    throw new Error(message)
-  }
-
-  const rawText = extractTextFromGeminiResponse(payload)
-  const words = extractJSONArray(rawText)
-  if (!words) throw new Error('Invalid response format from Gemini')
-
+  const safeLevel = ALLOWED_LEVELS.has(level) ? level : 'B1-B2'
   const localSet = new Set(existingGerman.map((w) => normalize(w)))
   const unique: Array<{ german: string; russian: string }> = []
-  for (const item of words) {
-    const german = item && typeof item === 'object' && 'german' in item ? String((item as { german?: string }).german || '').trim() : ''
-    const russian = item && typeof item === 'object' && 'russian' in item ? String((item as { russian?: string }).russian || '').trim() : ''
-    if (!german || !russian) continue
-    const key = normalize(german)
-    if (localSet.has(key)) continue
-    localSet.add(key)
-    unique.push({ german, russian })
-    if (unique.length >= count) break
+
+  for (let attempt = 0; attempt < 3 && unique.length < count; attempt += 1) {
+    const requestCount = Math.max(count - unique.length + 5, 8)
+    const prompt = buildPrompt(category, safeLevel, requestCount, [...existingGerman, ...Array.from(localSet)])
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          generationConfig: {
+            temperature: 0.35,
+            topP: 0.9,
+            responseMimeType: 'application/json'
+          },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        })
+      }
+    )
+
+    const payload = await response.json()
+    if (!response.ok) {
+      const message =
+        payload && typeof payload === 'object' && 'error' in payload
+          ? ((payload as { error?: { message?: string } }).error?.message ?? 'Gemini request failed')
+          : 'Gemini request failed'
+      throw new Error(message)
+    }
+
+    const rawText = extractTextFromGeminiResponse(payload)
+    const words = parseCandidates(rawText)
+    if (!words) continue
+
+    for (const item of words) {
+      const german = item && typeof item === 'object' && 'german' in item ? String((item as { german?: string }).german || '').trim() : ''
+      const russian = item && typeof item === 'object' && 'russian' in item ? String((item as { russian?: string }).russian || '').trim() : ''
+      const itemLevel = item && typeof item === 'object' && 'level' in item ? String((item as { level?: string }).level || '').trim() : ''
+      const spellingOk = !(item && typeof item === 'object' && 'spellingOk' in item && (item as { spellingOk?: boolean }).spellingOk === false)
+      const translationAccurate = !(item && typeof item === 'object' && 'translationAccurate' in item && (item as { translationAccurate?: boolean }).translationAccurate === false)
+
+      if (!german || !russian) continue
+      if (!isLikelyGermanWord(german) || !isLikelyRussianText(russian)) continue
+      if (itemLevel && itemLevel !== safeLevel) continue
+      if (!spellingOk || !translationAccurate) continue
+
+      const key = normalize(german)
+      if (localSet.has(key)) continue
+      localSet.add(key)
+      unique.push({ german, russian })
+      if (unique.length >= count) break
+    }
   }
 
-  return unique
+  if (unique.length === 0) {
+    throw new Error('Could not generate validated words for this category and level.')
+  }
+
+  return unique.slice(0, count)
 }
 
 export default defineConfig(({ mode }) => {

@@ -59,8 +59,8 @@ export function Menu({
             Continue learning
           </button>
          
-          <button className="menu-btn" onClick={() => onOpenLibrary('words')}>
-            Manage Words
+          <button className="menu-btn" onClick={() => onOpenLibrary('add')}>
+            Add Words
           </button>
          
           <button className="menu-btn danger" onClick={handleReset}>

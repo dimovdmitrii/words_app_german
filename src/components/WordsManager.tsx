@@ -51,6 +51,9 @@ interface GeneratedCandidate {
   selected: boolean
 }
 
+const CEFR_LEVEL_OPTIONS = ['A1-A2', 'B1-B2', 'C1-C2'] as const
+type CefrBand = (typeof CEFR_LEVEL_OPTIONS)[number]
+
 export function WordsManager({
   initialTab = 'categories',
   categories,
@@ -87,6 +90,7 @@ export function WordsManager({
 
   // — Generate tab —
   const [generateCategory, setGenerateCategory] = useState('')
+  const [generateLevel, setGenerateLevel] = useState<CefrBand>('B1-B2')
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [generateInfo, setGenerateInfo] = useState<string | null>(null)
@@ -218,6 +222,7 @@ export function WordsManager({
 
   const requestGeneratedWords = async (
     category: string,
+    level: CefrBand,
     count: number,
     excludedGerman: string[]
   ): Promise<Array<{ german: string; russian: string }>> => {
@@ -226,7 +231,7 @@ export function WordsManager({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         category,
-        level: 'B1-B2',
+        level,
         count,
         existingGerman: excludedGerman
       })
@@ -274,7 +279,7 @@ export function WordsManager({
         ...rejectedGeneratedGerman,
         ...additionallyRejected
       ]
-      const words = await requestGeneratedWords(category, missingCount, excludedGerman)
+      const words = await requestGeneratedWords(category, generateLevel, missingCount, excludedGerman)
       if (words.length === 0) return
 
       const newCandidates: GeneratedCandidate[] = words.map(
@@ -330,6 +335,7 @@ export function WordsManager({
     try {
       const words = await requestGeneratedWords(
         category,
+        generateLevel,
         GENERATE_TARGET,
         allWords.map((w) => w.german)
       )
@@ -708,6 +714,24 @@ export function WordsManager({
                 </datalist>
               </div>
 
+              <div className="wm-form-field">
+                <label className="wm-form-label" htmlFor="wm-generate-level">
+                  Level *
+                </label>
+                <select
+                  id="wm-generate-level"
+                  className="wm-form-input"
+                  value={generateLevel}
+                  onChange={(e) => setGenerateLevel(e.target.value as CefrBand)}
+                >
+                  {CEFR_LEVEL_OPTIONS.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button
                 type="button"
                 className="menu-btn primary"
@@ -718,7 +742,7 @@ export function WordsManager({
                   ? 'Generating...'
                   : isGenerateCooldown
                   ? `Try in ${formatCooldown(cooldownRemainingSec)}`
-                  : 'Generate 15 words (B1-B2)'}
+                  : `Generate 15 words (${generateLevel})`}
               </button>
 
               {generateError && <p className="wm-form-error">{generateError}</p>}
