@@ -81,6 +81,7 @@ body {
   top: 12px;
   left: 16px;
   right: 12px;
+  z-index: 2;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -229,14 +230,19 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   gap: 5px;
-  width: 36px;
-  height: 36px;
-  padding: 8px;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  margin: 0;
   background: transparent;
   border: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
 .hamburger span {
