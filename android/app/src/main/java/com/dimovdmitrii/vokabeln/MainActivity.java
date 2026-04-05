@@ -9,6 +9,8 @@ public class MainActivity extends BridgeActivity {
   @Override
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+    // Task switcher / some launchers read activity title from resources
+    setTitle(R.string.app_name);
     // Pixel / gesture nav: let WebView extend into system bar insets so JS innerHeight matches the visible area.
     WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
     getWindow().setStatusBarColor(Color.TRANSPARENT);

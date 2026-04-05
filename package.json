@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:android": "tsc -b && vite build --mode android && npx cap sync android",
+    "build:android": "node scripts/bump-android-version.mjs && tsc -b && vite build --mode android && npx cap sync android",
     "icons:android": "node scripts/generate-android-icons.mjs",
     "lint": "eslint . --ext ts,tsx",
     "preview": "vite preview"
