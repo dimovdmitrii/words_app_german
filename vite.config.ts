@@ -233,8 +233,18 @@ export default defineConfig(({ mode }) => {
         }
       },
       // Service worker / Workbox breaks many Android WebViews (blank screen). PWA stays for web builds only.
-      ...(mode === 'android'
-        ? []
+      ...((mode === 'android'
+        ? [
+            {
+              name: 'android-unregister-stale-sw',
+              transformIndexHtml(html: string) {
+                // Old installs may still have a PWA SW; it keeps requesting sw.js → blank screen. Drop SW then reload once.
+                const snippet =
+                  '<script>(function(){if(!("serviceWorker"in navigator))return;navigator.serviceWorker.getRegistrations().then(function(r){if(!r.length)return;return Promise.all(r.map(function(x){return x.unregister()})).then(function(){location.reload()})})})();</script>'
+                return html.replace('<head>', `<head>${snippet}`)
+              }
+            }
+          ]
         : [
             VitePWA({
               registerType: 'autoUpdate',
@@ -260,7 +270,8 @@ export default defineConfig(({ mode }) => {
               },
               devOptions: { enabled: true }
             })
-          ])
+          ]
+        ))
     ]
   }
 })
