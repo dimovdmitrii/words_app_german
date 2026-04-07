@@ -39,9 +39,11 @@ npm install
 npm run dev
 ```
 
+
 ## Build & deploy
 
 ```bash
+npm run icons:android
 npm run build
 ```
 

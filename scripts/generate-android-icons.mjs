@@ -17,8 +17,8 @@ const androidRes = join(root, 'android/app/src/main/res')
 
 const SOURCE_PATH = join(publicDir, 'favicon.png')
 
-/** Подложка под legacy launcher, если в PNG прозрачные края */
-const pad = { r: 1, g: 141, b: 251, alpha: 1 }
+/** Legacy launcher background if source has transparent edges */
+const pad = { r: 255, g: 255, b: 255, alpha: 1 }
 
 const legacy = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 }
 const adaptiveFg = { mdpi: 108, hdpi: 162, xhdpi: 216, xxhdpi: 324, xxxhdpi: 432 }
